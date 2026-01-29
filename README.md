@@ -1,388 +1,286 @@
-# BCLA IPEDS Data Collection Project
+# BCLA Library Data Import Workflow
 
-## Project Overview
-This project collects historical IPEDS (Integrated Postsecondary Education Data System) data for BCLA consortium member institutions using the Education Data Portal API. The collected data will be shared via Airtable for consortium-wide access and analysis.
+This workflow processes IPEDS .accdb files (2019-2024) to create a SQLite database with Academic Libraries and Fall Enrollment data for BCLA member institutions.
 
-**Objective**: Create a historical database (2013-present) of key library statistics before IPEDS Academic Libraries data collection ends in 2024-25.
+## Overview
 
----
+The workflow consists of three Python scripts that work together:
 
-## What This Project Does
+1. **bcla_library_import.py** - Extracts data from .accdb files into SQLite
+2. **bcla_variable_titles.py** - Adds user-friendly column names from Excel documentation
+3. **bcla_report_generator.py** - Creates Excel reports for committee presentation
 
-This automated data collection system:
-- ✅ Collects data for 34 BCLA member institutions
-- ✅ Covers academic years 2013-2024
-- ✅ Gathers 3 key metrics:
-  - Total library expenses
-  - Database count
-  - Fall FTE enrollment
-- ✅ Exports to CSV for easy Airtable import
-- ✅ Uses the Education Data Portal API (no Access files needed!)
+## Files You Need
 
----
+Before running the scripts, make sure you have these files in your project directory:
 
-## Files Included
+### IPEDS .accdb files (5 files):
+- `ipeds201920.accdb` (2019-20 academic year)
+- `ipeds202021.accdb` (2020-21 academic year)
+- `ipeds202122.accdb` (2021-22 academic year)
+- `ipeds202223.accdb` (2022-23 academic year)
+- `ipeds202324.accdb` (2023-24 academic year)
 
-### 1. `bcla_ipeds_collector.py`
-**Main Python script** that collects the data from the API.
+### IPEDS Excel documentation files (5 files):
+- `ipeds201920tablesdoc.xlsx`
+- `ipeds202021tablesdoc.xlsx`
+- `ipeds202122tablesdoc.xlsx`
+- `ipeds202223tablesdoc.xlsx`
+- `ipeds202324tablesdoc.xlsx`
 
-**What it does**:
-- Loops through all 34 institutions
-- Fetches data for each year from 2013-2024
-- Makes API calls to two endpoints (Academic Libraries and Fall Enrollment)
-- Exports everything to a CSV file
+## Required Python Packages
 
-**Features**:
-- Beginner-friendly with extensive comments
-- Progress tracking so you can see how it's going
-- Error handling to skip missing data gracefully
-- Automatic CSV export with timestamp
-
-### 2. `airtable_import_instructions.md`
-**Step-by-step guide** for importing your CSV into Airtable.
-
-**Covers**:
-- Creating a new Airtable base
-- Setting up proper field types
-- Adding institution names for readability
-- Creating useful views (by year, by institution, etc.)
-- Sharing with consortium members
-- Common troubleshooting issues
-
-### 3. `ipeds_field_definitions.md`
-**Comprehensive documentation** of what each data field means.
-
-**Includes**:
-- Official IPEDS definitions
-- What's included/excluded in each metric
-- How to use the data effectively
-- Benchmarking suggestions
-- Links to additional IPEDS resources
-
-### 4. `bcla-institutions.txt`
-**Reference file** with the 34 BCLA member institution Unit IDs and names.
-
----
-
-## Prerequisites
-
-### Software Needed
-1. **Python 3** (you likely already have this)
-   - Check by opening Terminal/Command Prompt and typing: `python --version`
-   
-2. **Required Python packages**:
-   - `requests` (for API calls)
-   - `pandas` (for data handling)
-
-### Installing Required Packages
-
-Open your terminal/command prompt and run:
+Install the required packages using these commands in your terminal:
 
 ```bash
-pip install requests pandas --break-system-packages
+pip install pandas --break-system-packages
+pip install pyodbc --break-system-packages
+pip install openpyxl --break-system-packages
 ```
 
-**Note**: The `--break-system-packages` flag is needed on some systems (like Google Cloud) to install packages.
+**Note about pyodbc:** This package requires the Microsoft Access Database Engine. On Windows, this is usually already installed. If you get errors about missing drivers, you may need to install the Microsoft Access Database Engine Redistributable.
 
-### What You DON'T Need
-❌ Access files - The API provides all necessary data  
-❌ SQLite database - This project uses API directly  
-❌ Complex setup - Just Python and two packages
+## Step-by-Step Instructions
 
----
+### Step 1: Extract Data from .accdb Files
 
-## How to Run the Script
+Run the main import script:
 
-### Step 1: Prepare Your Environment
-
-1. **Download all project files** to a folder on your computer
-2. **Open terminal/command prompt** and navigate to that folder:
-   ```bash
-   cd /path/to/your/project/folder
-   ```
-
-### Step 2: Run the Data Collection Script
-
-Simply type:
 ```bash
-python bcla_ipeds_collector.py
+python3 bcla_library_import.py
 ```
 
-### Step 3: Watch the Progress
+**What this does:**
+- Connects to each .accdb file
+- Extracts three types of tables for each year:
+  - DRVEF (Fall Enrollment - contains FTE variable)
+  - AL (Academic Libraries - 37 variables)
+  - DRVAL (Derived Academic Library Variables - 19 variables)
+  - HD (Directory information - institution names)
+- Filters to only BCLA institutions (34 institutions)
+- Saves all data to `bcla_library.sqlite`
 
-You'll see output like this:
-```
-BCLA IPEDS Data Collection Script
-======================================================================
-Starting data collection for 34 institutions across 12 years...
-Total API calls to make: 816 (2 endpoints per year/institution)
-----------------------------------------------------------------------
+**What to expect:**
+- The script will process each year and show progress
+- It will ask to confirm if you want to overwrite an existing database
+- At the end, you'll see a verification showing all tables created
 
-Processing Unit ID: 156189
-  Year 2013 (1/408 - 0.2%)
-  Year 2014 (2/408 - 0.5%)
-  ...
-```
+**Estimated time:** 2-5 minutes depending on your computer
 
-**How long will this take?**
-- Approximately 6-8 minutes total
-- The script waits 0.5 seconds between requests to be polite to the API
-- Total requests: ~816 API calls (34 institutions × 12 years × 2 endpoints)
+### Step 2: Import Variable Titles
 
-### Step 4: Find Your Output File
+Run the variable titles script:
 
-When complete, you'll see:
-```
-Data exported to: bcla_ipeds_data_20250121_143000.csv
-Total rows: 408
-Columns: unitid, year, total_expenses, database_count, fte, ...
+```bash
+python3 bcla_variable_titles.py
 ```
 
-The CSV file will be in the same folder where you ran the script.
+**What this does:**
+- Reads the 'vartable' sheets from each Excel documentation file
+- Creates a lookup table that maps variable codes (like 'FTE', 'LEXPTOT') to readable names (like 'Full-time equivalent fall enrollment', 'Total library expenditures')
+- Tracks if variable titles changed between years
+- Adds the `variable_titles` table to your database
 
----
+**What to expect:**
+- The script will read each Excel file and show progress
+- At the end, you'll see a sample of variable mappings
+- If any variable titles changed between years, you'll see a count
 
-## Understanding the Output
+**Estimated time:** Less than 1 minute
 
-### CSV File Structure
+### Step 3: Generate Reports
 
-Your CSV will have these columns:
+Run the report generator:
 
-| Column | Description | Example |
-|--------|-------------|---------|
-| unitid | Institution ID | 156189 |
-| year | Academic year | 2024 |
-| total_expenses | Library expenses (USD) | 1250000 |
-| database_count | Number of databases | 85 |
-| fte | Full-time equivalent enrollment | 1234.56 |
-| acad_lib_raw | Raw API response (reference) | {...} |
-| fall_enroll_raw | Raw API response (reference) | {...} |
+```bash
+python3 bcla_report_generator.py
+```
 
-### Expected Results
+**What this does:**
+- Shows a summary of data availability
+- Asks what type of report you want:
+  - **Option 1:** Combined report (all years in one Excel file)
+  - **Option 2:** Separate reports by year (one Excel file per year)
+  - **Option 3:** Both
+- Creates Excel files with user-friendly column names
 
-- **Total rows**: 408 (34 institutions × 12 years)
-- **Some missing data is normal**: Not all institutions report all data every year
-- **Raw data columns**: These contain the full API response for debugging purposes
+**What to expect:**
+- You'll see a data availability summary
+- You'll be prompted to choose a report type
+- Excel files will be created in your current directory with timestamps
 
-### Sample Data Check
+**Estimated time:** 1-3 minutes depending on report type
 
-Open your CSV and verify:
-1. You see data for multiple institutions (should be 34 different unitids)
-2. Years range from 2013 to 2024
-3. Some rows have expenses, database counts, and FTE values
-4. Some cells may be blank (this is expected for missing data)
+## Output Files
 
----
+After running all three scripts, you'll have:
 
-## Next Steps
+1. **bcla_library.sqlite** - Your SQLite database with all the data
+2. **BCLA_Library_Combined_YYYYMMDD_HHMMSS.xlsx** - Combined report (if you chose option 1 or 3)
+3. **BCLA_Library_2019_YYYYMMDD_HHMMSS.xlsx** through **BCLA_Library_2023_YYYYMMDD_HHMMSS.xlsx** - Year-specific reports (if you chose option 2 or 3)
 
-### 1. Review the Data (Recommended)
-- Open the CSV in Excel or a text editor
-- Spot-check a few familiar institutions
-- Look for obvious errors or anomalies
+The timestamp (YYYYMMDD_HHMMSS) ensures files don't overwrite each other when you run the script multiple times.
 
-### 2. Import to Airtable
-- Follow the instructions in `airtable_import_instructions.md`
-- This will guide you through creating a base and setting up views
+## Understanding the Data Structure
 
-### 3. Share Documentation
-- Send `ipeds_field_definitions.md` to consortium members
-- This explains what each field means and how to use the data
+### Tables in the Database
 
-### 4. Set Up Regular Updates
-Since new IPEDS data comes out annually:
-- Run this script again in Fall 2025 for 2024-25 data
-- Re-import the updated CSV to Airtable
-- Consider setting a calendar reminder
+Your SQLite database will contain these tables:
 
----
+**Data Tables (3 per year × 5 years = 15 tables):**
+- `drvef2019` through `drvef2023` - Fall Enrollment with FTE variable
+- `al2019` through `al2023` - Academic Libraries data (37 variables)
+- `drval2019` through `drval2023` - Derived Academic Library Variables (19 variables)
+
+**Institution Tables (5 tables):**
+- `hd2019` through `hd2023` - Institution names and IDs
+
+**Lookup Tables (2 tables):**
+- `variable_titles` - Maps variable codes to readable names
+- `variable_titles_lookup` - View for easy access
+
+### Excel Report Column Names
+
+Column names in the Excel reports follow this pattern:
+- **Combined report:** `Year - TableType - Variable Title`
+  - Example: `2023 - AL - Total library expenditures`
+- **Year-specific reports:** `TableType - Variable Title`
+  - Example: `AL - Total library expenditures`
 
 ## Troubleshooting
 
-### Error: "Module not found: requests"
-**Solution**: Install the required package:
-```bash
-pip install requests --break-system-packages
+### "Database not found" error
+- Make sure you run the scripts in order (import → variable titles → report generator)
+- Check that you're in the correct directory
+
+### "File not found" error for .accdb files
+- Make sure all .accdb files are in the same directory as the script
+- Check that filenames match exactly (case-sensitive on some systems)
+
+### "No variable mappings loaded" error
+- Check that Excel documentation files are in the same directory
+- Verify that the files contain a sheet named 'vartableXX' (where XX is the year)
+
+### pyodbc driver errors
+- On Windows: Install Microsoft Access Database Engine Redistributable
+- Download from: https://www.microsoft.com/en-us/download/details.aspx?id=54920
+- Make sure to install the version (32-bit or 64-bit) that matches your Python installation
+
+## Customization
+
+### Changing Institution List
+
+If you need to add or remove institutions, edit the `BCLA_UNITIDS` list in `bcla_library_import.py`:
+
+```python
+BCLA_UNITIDS = [
+    156189,  # Alice Lloyd College
+    156295,  # Berea College
+    # ... add or remove institution IDs here
+]
 ```
 
-### Error: "Module not found: pandas"
-**Solution**: Install the required package:
-```bash
-pip install pandas --break-system-packages
+### Changing Years
+
+If you need to process different years, edit the `YEARS` list in `bcla_library_import.py`:
+
+```python
+YEARS = [2019, 2020, 2021, 2022, 2023]  # Modify as needed
 ```
 
-### Error: "Connection timeout" or "API error"
-**Possible causes**:
-- Internet connection issue
-- Education Data Portal API is temporarily down
-- Network firewall blocking the API
+Also update `FILE_MAPPINGS` in `bcla_variable_titles.py` to match.
 
-**Solution**: 
-- Check your internet connection
-- Wait a few minutes and try again
-- If it persists, check https://educationdata.urban.org/ for API status
+## Version Control with Git
 
-### All data shows as missing for a specific institution
-**This is normal if**:
-- The institution is very small (below IPEDS reporting threshold)
-- The institution didn't submit data for that year
-- The institution's library is integrated into another system
+When you're ready to save your work to GitHub:
 
-**Solution**: No action needed - document this in your Airtable
+1. **Initialize repository (first time only):**
+   ```bash
+   git init
+   git add bcla_library_import.py bcla_variable_titles.py bcla_report_generator.py README.md
+   git commit -m "Initial commit: BCLA library data import scripts"
+   ```
 
-### Script is taking a very long time
-**Expected runtime**: 6-8 minutes for 816 API calls
+2. **Create .gitignore file:**
+   Create a file named `.gitignore` with these contents:
+   ```
+   # Ignore data files
+   *.accdb
+   *.sqlite
+   *.xlsx
+   
+   # Ignore Python cache
+   __pycache__/
+   *.pyc
+   ```
 
-**If it's taking much longer**:
-- Check your internet connection speed
-- The script waits 0.5 seconds between requests (this is intentional)
-- You can reduce the wait time by editing line 145: `time.sleep(0.5)` → `time.sleep(0.2)`
+3. **Push to GitHub:**
+   ```bash
+   git remote add origin <your-github-repo-url>
+   git push -u origin main
+   ```
 
----
+4. **Save changes as you work:**
+   ```bash
+   git add .
+   git commit -m "Descriptive message about what you changed"
+   git push
+   ```
 
-## Technical Notes
+## Next Steps for Your Project
 
-### API Rate Limiting
-- The script includes a 0.5 second delay between requests
-- This prevents overwhelming the Education Data Portal API
-- You can adjust this in the code if needed (line 145)
+After generating the reports:
 
-### Data Persistence
-- Each run creates a NEW CSV file with a timestamp
-- This prevents accidentally overwriting previous data
-- You can safely run the script multiple times
-
-### Field Name Variations
-The API may return data in different field names depending on the year:
-- Total expenses: `total_expenses`, `ltotexpn`, or `F2223_F2`
-- Database count: `database_count` or `ldbs`
-- FTE: `fte`, `fte_total`, or `efytotlt`
-
-The script checks for all variations automatically.
-
----
-
-## Updating the Script for Future Use
-
-### Adding More Years
-When 2025 data becomes available (likely Fall 2026):
-
-1. Open `bcla_ipeds_collector.py`
-2. Find line 19: `YEARS = list(range(2013, 2025))`
-3. Change to: `YEARS = list(range(2013, 2026))`  # Adds 2025
-4. Save and run
-
-### Adding/Removing Institutions
-If consortium membership changes:
-
-1. Edit the `INSTITUTION_IDS` list (lines 24-58)
-2. Add new institution Unit IDs or remove ones that left
-3. Update the count on line 102 if needed
-
-### Adding More Data Fields
-If you want to collect additional IPEDS fields:
-
-1. Check the Education Data Portal API documentation
-2. Find the field name you want
-3. Add it to the relevant section in the script (around lines 124-142)
-4. The raw data is already being collected, so you can extract new fields from those
-
----
-
-## Version Control with GitHub (Optional)
-
-Since you're learning GitHub, here's how to track this project:
-
-### Initial Setup
-```bash
-git init
-git add .
-git commit -m "Initial commit: BCLA IPEDS data collection project"
-```
-
-### After Running the Script
-```bash
-git add bcla_ipeds_data_*.csv
-git commit -m "Collected IPEDS data for 2013-2024"
-```
-
-### Recommended .gitignore
-Create a `.gitignore` file with:
-```
-*.csv
-__pycache__/
-*.pyc
-```
-
-This prevents uploading large CSV files to GitHub.
-
----
-
-## Support and Resources
-
-### IPEDS Resources
-- IPEDS Data Center: https://nces.ed.gov/ipeds/datacenter/
-- IPEDS Help: ipedshelp@rti.org or 1-877-225-2568
-
-### Education Data Portal Resources
-- Homepage: https://educationdata.urban.org/
-- API Documentation: https://educationdata.urban.org/documentation/
-
-### Airtable Resources
-- Airtable Support: https://support.airtable.com
-- Video Tutorials: https://www.youtube.com/c/Airtable
-
-### Python Resources
-- Python Beginner's Guide: https://www.python.org/about/gettingstarted/
-- Pandas Documentation: https://pandas.pydata.org/docs/
-
----
-
-## Project Timeline
-
-### Immediate Next Steps (Week 1)
-- ✅ Run the data collection script
-- ✅ Review CSV output for accuracy
-- ✅ Set up Airtable base
-- ✅ Import data to Airtable
-
-### Short Term (Month 1)
-- Share Airtable with consortium members
-- Gather feedback on data usefulness
-- Create visualizations in Airtable
-- Present at January 2026 committee meeting
-
-### Long Term (Ongoing)
-- Annual data updates (Fall each year)
-- Consider additional metrics to track
-- Develop direct ACA survey for post-2025 data
-- Maintain documentation
-
----
+1. **Review the data** - Open the Excel files and verify the data looks correct
+2. **Check for missing data** - Some institutions may not have reported certain variables in certain years
+3. **Prepare for committee** - Use the Excel reports to create your presentation
+4. **Document definitions** - The variable titles table has the official IPEDS definitions
+5. **Plan Airtable migration** - Once committee approves, you can import the Excel files to Airtable
 
 ## Questions or Issues?
 
-If you encounter problems or have questions:
+If you encounter problems:
+1. Check the error messages - they often tell you exactly what's wrong
+2. Verify all required files are in place
+3. Make sure you ran the scripts in order
+4. Check that Python packages are installed correctly
 
-1. **Check the Troubleshooting section** above
-2. **Review the error message** carefully - it often tells you what's wrong
-3. **Verify your Python packages** are installed correctly
-4. **Check the Education Data Portal status** at their website
-5. **Document the issue** for future reference
+## Script Descriptions
 
-Remember: It's okay to experiment! Each run creates a new CSV file with a timestamp, so you can't accidentally lose data by running the script multiple times.
+### bcla_library_import.py
+The main workhorse script. It:
+- Uses the `pyodbc` library to connect to Microsoft Access databases
+- Loops through each year (2019-2023)
+- For each year, extracts the needed tables (DRVEF, AL, DRVAL, HD)
+- Filters each table to only BCLA institutions
+- Saves everything to a SQLite database
 
----
+**Key functions:**
+- `connect_to_accdb()` - Creates connection to .accdb file
+- `get_table_from_accdb()` - Extracts a table and filters by institution
+- `process_year()` - Processes all tables for one year
+- `save_to_sqlite()` - Saves all data to database
 
-## Success Criteria
+### bcla_variable_titles.py
+Creates readable column names. It:
+- Reads the 'vartable' sheets from Excel documentation
+- Combines variable titles across all years
+- Identifies if titles changed between years
+- Creates a lookup table in the database
 
-You'll know the project is successful when:
-- ✅ CSV file contains 408 rows (34 institutions × 12 years)
-- ✅ Most rows have data in total_expenses, database_count, and fte columns
-- ✅ Airtable base is set up and shareable with consortium
-- ✅ Consortium members can access and understand the data
-- ✅ You have a process for annual updates
+**Key functions:**
+- `read_variable_mappings()` - Reads Excel files
+- `create_consolidated_variables_table()` - Combines all years
+- `save_to_sqlite()` - Saves to database
 
----
+### bcla_report_generator.py
+Creates Excel reports. It:
+- Reads data from the SQLite database
+- Looks up user-friendly names for variables
+- Combines data from multiple tables
+- Creates Excel files with your data
 
-**Good luck with your data collection! This is a valuable contribution to the BCLA consortium.** 🎉
+**Key functions:**
+- `generate_combined_report()` - Creates one file with all years
+- `generate_year_reports()` - Creates one file per year
+- `save_reports()` - Writes Excel files

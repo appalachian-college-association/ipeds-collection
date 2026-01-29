@@ -1,4 +1,18 @@
 .history
+.logs
 .venv
 *.csv
 bcla-institutions.txt
+*.xlsx
+airtable_import_instructions.md
+*.sqlite
+*.sql
+*.txt
+!requirements.txt
+IPEDS*
+PROJECT_STATUS.md
+# Python
+__pycache__/
+*.pyc
+
+
