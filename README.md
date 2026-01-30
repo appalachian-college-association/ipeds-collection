@@ -23,11 +23,11 @@ Before running the scripts, make sure you have these files in your project direc
 - `IPEDS202324.accdb` (2023-24 academic year)
 
 ### IPEDS Excel documentation files (5 files):
-- `IPEDS201920tablesdoc.xlsx`
-- `IPEDS202021tablesdoc.xlsx`
-- `IPEDS202122tablesdoc.xlsx`
-- `IPEDS202223tablesdoc.xlsx`
-- `IPEDS202324tablesdoc.xlsx`
+- `IPEDS201920TablesDoc.xlsx`
+- `IPEDS202021TablesDoc.xlsx`
+- `IPEDS202122TablesDoc.xlsx`
+- `IPEDS202223TablesDoc.xlsx`
+- `IPEDS202324TablesDoc.xlsx`
 
 These files are available for download from IPEDS:
 https://nces.ed.gov/ipeds/use-the-data/download-access-database (last accessed 1/30/2026)
