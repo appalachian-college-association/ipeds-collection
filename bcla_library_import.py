@@ -155,15 +155,16 @@ def process_year(year, accdb_path):
     
     # Define which tables we need for this year
     # Table numbers are used to match tables across years
-    # From project-variables-accdb.csv:
+    # From project-variables-accdb.xlsx:
     # - Table 27 = Fall Enrollment (DRVEF)
     # - Table 160 = Academic Libraries (AL)
     # - Table 161 = Derived Academic Library Variables (DRVAL)
     
     tables_to_extract = [
-        f'DRVEF{year}',    # Fall Enrollment (FTE)
-        f'AL{year}',       # Academic Libraries
-        f'DRVAL{year}',    # Derived Academic Library Variables
+        f'DRVEF{year}',                             # Fall Enrollment (FTE)
+        f'AL{year}',                                # Academic Libraries Survey (n/a after FY2324)
+        f'DRVAL{year}',                             # Derived Academic Library Variables
+        f'F{str(year-1)[-2:]}{str(year)[-2:]}_F2'   # Financial Variables
     ]
     
     # Also get HD (Directory) table for institution names
@@ -256,7 +257,7 @@ def verify_database(db_path):
         print(f"\n  {table_name}:")
         print(f"    Rows: {count}")
         print(f"    Columns: {len(columns)}")
-        print(f"    Column names: {', '.join(columns[:5])}{'...' if len(columns) > 5 else ''}")
+        print(f"    Column names: {', '.join(columns[:6])}{'...' if len(columns) > 6 else ''}")
     
     conn.close()
 
@@ -278,7 +279,7 @@ def main():
     # Check if database already exists
     if os.path.exists(DB_PATH):
         response = input(f"\n⚠ Database {DB_PATH} already exists. Overwrite? (yes/no): ")
-        if response.lower() != 'yes':
+        if response.lower() not in ('yes', 'y'):
             print("Import cancelled.")
             return
         # Remove existing database

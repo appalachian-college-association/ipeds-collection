@@ -19,6 +19,16 @@ from datetime import datetime
 # SQLite database path
 DB_PATH = "bcla_library.sqlite"
 
+# Define which variables to include from each table type
+# Format: 'table_prefix': ['varName1', 'varName2', ...]
+# Use None or empty list [] to include ALL variables from that table type
+VARIABLE_FILTERS = {
+    'drvef': ['FTE'],           # Only include FTE from DRVEF tables
+    'f': ['F2E131'],            # Only include F2E131 (Total expenses) from Finance tables
+    'al': None,                 # Include ALL variables from AL tables
+    'drval': None               # Include ALL variables from DRVAL tables
+}
+
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
@@ -62,6 +72,64 @@ def get_column_title(cursor, var_name):
         return var_name
 
 
+def get_table_type(table_name):
+    """
+    Extract the table type from a table name.
+    
+    Examples:
+        'drvef2019' -> 'drvef'
+        'f2223_f2' -> 'f'
+        'al2020' -> 'al'
+        'drval2021' -> 'drval'
+    
+    Args:
+        table_name (str): The full table name
+        
+    Returns:
+        str: The table type (prefix)
+    """
+    # Convert to lowercase for comparison
+    table_lower = table_name.lower()
+    
+    # Check each known table type
+    for table_type in VARIABLE_FILTERS.keys():
+        if table_lower.startswith(table_type):
+            return table_type
+    
+    # If no match, return the alphabetic prefix
+    return ''.join(filter(str.isalpha, table_lower))
+
+
+def should_include_variable(table_name, var_name):
+    """
+    Determine if a variable should be included in the report based on filters.
+    
+    Args:
+        table_name (str): The table name (e.g., 'drvef2019', 'f2223_f2')
+        var_name (str): The variable name (e.g., 'FTE', 'F2E131')
+        
+    Returns:
+        bool: True if the variable should be included
+    """
+    # Get the table type
+    table_type = get_table_type(table_name)
+    
+    # Check if this table type has filters
+    if table_type not in VARIABLE_FILTERS:
+        # No filter defined for this table type, include all variables
+        return True
+    
+    # Get the filter for this table type
+    filter_list = VARIABLE_FILTERS[table_type]
+    
+    # If filter is None or empty, include all variables
+    if filter_list is None or len(filter_list) == 0:
+        return True
+    
+    # Check if this variable is in the filter list
+    return var_name in filter_list
+
+
 def generate_combined_report(conn):
     """
     Generate a combined report with all years and all variables.
@@ -79,7 +147,7 @@ def generate_combined_report(conn):
     tables = get_database_tables(conn)
     
     # Group tables by type and year
-    # We have tables like: drvef2019, drvef2020, al2019, al2020, drval2019, etc.
+    # We have tables like: drvef2019, drvef2020, al2019, al2020, drval2019, f2223_f2, etc.
     
     # Start with HD tables to get institution names
     hd_tables = [t for t in tables if t.startswith('hd')]
@@ -95,7 +163,7 @@ def generate_combined_report(conn):
     else:
         print("⚠ Warning: No HD table found, using UNITIDs without names")
         # Get UNITIDs from one of the data tables
-        first_table = [t for t in tables if t.startswith(('drvef', 'al', 'drval'))][0]
+        first_table = [t for t in tables if t.startswith(('drvef', 'al', 'drval', 'f'))][0]
         query = f"SELECT DISTINCT UNITID FROM {first_table}"
         institutions_df = pd.read_sql_query(query, conn)
         institutions_df['Institution Name'] = None
@@ -106,7 +174,7 @@ def generate_combined_report(conn):
     print(f"Found {len(institutions_df)} institutions")
     
     # Now process each type of table
-    data_tables = [t for t in tables if t.startswith(('drvef', 'al', 'drval'))]
+    data_tables = [t for t in tables if t.startswith(('drvef', 'al', 'drval', 'f'))]
     
     # Sort tables by year and type
     data_tables.sort()
@@ -123,17 +191,34 @@ def generate_combined_report(conn):
         # Read the entire table
         table_df = pd.read_sql_query(f"SELECT * FROM {table}", conn)
         
-        # Get year from table name (e.g., 'drvef2019' -> '2019')
-        year = ''.join(filter(str.isdigit, table))
+        # Get year from table name
+        # For regular tables like 'drvef2019' -> '2019'
+        # For finance tables like 'f2223_f2' -> '2023' (the end year)
+        if table.lower().startswith('f'):
+            # Finance table - extract year from format like 'f2223_f2'
+            year_part = ''.join(filter(str.isdigit, table))[:4]  # Get first 4 digits
+            # Convert YYyy to 20yy (e.g., '2223' -> '2023')
+            year = '20' + year_part[2:4]
+        else:
+            year = ''.join(filter(str.isdigit, table))
         
-        # Get table type (e.g., 'drvef2019' -> 'drvef')
-        table_type = ''.join(filter(str.isalpha, table))
+        # Get table type
+        table_type = get_table_type(table)
+        
+        # Count how many variables we'll include
+        included_vars = 0
         
         # Merge with result_df on UNITID
         # For each column in table_df (except UNITID), create a new column in result_df
         for col in table_df.columns:
             if col == 'UNITID':
                 continue
+            
+            # Check if this variable should be included
+            if not should_include_variable(table, col):
+                continue
+            
+            included_vars += 1
             
             # Get the user-friendly title for this variable
             col_title = get_column_title(cursor, col)
@@ -146,6 +231,8 @@ def generate_combined_report(conn):
             merge_df.columns = ['UNITID', new_col_name]
             
             result_df = result_df.merge(merge_df, on='UNITID', how='left')
+        
+        print(f"    Included {included_vars} variable(s)")
     
     print(f"\n✓ Combined report created: {len(result_df)} rows × {len(result_df.columns)} columns")
     
@@ -173,9 +260,15 @@ def generate_year_reports(conn):
     # Extract years from table names
     years = set()
     for table in tables:
-        year = ''.join(filter(str.isdigit, table))
-        if year and len(year) == 4:
+        if table.lower().startswith('f'):
+            # Finance table like 'f2223_f2'
+            year_part = ''.join(filter(str.isdigit, table))[:4]
+            year = '20' + year_part[2:4]  # Convert to 2023
             years.add(year)
+        else:
+            year = ''.join(filter(str.isdigit, table))
+            if year and len(year) == 4:
+                years.add(year)
     
     years = sorted(years)
     
@@ -192,7 +285,7 @@ def generate_year_reports(conn):
             institutions_df.columns = ['UNITID', 'Institution Name']
         else:
             # Use any table from this year to get UNITIDs
-            year_tables = [t for t in tables if year in t and t.startswith(('drvef', 'al', 'drval'))]
+            year_tables = [t for t in tables if year in t and t.startswith(('drvef', 'al', 'drval', 'f'))]
             if year_tables:
                 query = f"SELECT DISTINCT UNITID FROM {year_tables[0]}"
                 institutions_df = pd.read_sql_query(query, conn)
@@ -205,7 +298,17 @@ def generate_year_reports(conn):
         year_df = institutions_df.copy()
         
         # Get all tables for this year
-        year_tables = [t for t in tables if year in t and t.startswith(('drvef', 'al', 'drval'))]
+        # For finance tables, need to match differently
+        year_tables = []
+        for t in tables:
+            if t.lower().startswith('f'):
+                # Finance table - check if end year matches
+                year_part = ''.join(filter(str.isdigit, t))[:4]
+                end_year = '20' + year_part[2:4]
+                if end_year == year:
+                    year_tables.append(t)
+            elif year in t and t.startswith(('drvef', 'al', 'drval')):
+                year_tables.append(t)
         
         # Process each table
         for table in year_tables:
@@ -215,12 +318,21 @@ def generate_year_reports(conn):
             table_df = pd.read_sql_query(f"SELECT * FROM {table}", conn)
             
             # Get table type
-            table_type = ''.join(filter(str.isalpha, table)).upper()
+            table_type = get_table_type(table).upper()
+            
+            # Count included variables
+            included_vars = 0
             
             # Merge each column
             for col in table_df.columns:
                 if col == 'UNITID':
                     continue
+                
+                # Check if this variable should be included
+                if not should_include_variable(table, col):
+                    continue
+                
+                included_vars += 1
                 
                 # Get user-friendly title
                 col_title = get_column_title(cursor, col)
@@ -233,6 +345,8 @@ def generate_year_reports(conn):
                 merge_df.columns = ['UNITID', new_col_name]
                 
                 year_df = year_df.merge(merge_df, on='UNITID', how='left')
+            
+            print(f"      Included {included_vars} variable(s)")
         
         print(f"    ✓ Year {year} report: {len(year_df)} rows × {len(year_df.columns)} columns")
         year_reports[year] = year_df
@@ -298,9 +412,15 @@ def generate_summary_report(conn):
     # Get all years
     years = set()
     for table in tables:
-        year = ''.join(filter(str.isdigit, table))
-        if year and len(year) == 4:
+        if table.lower().startswith('f'):
+            # Finance table
+            year_part = ''.join(filter(str.isdigit, table))[:4]
+            year = '20' + year_part[2:4]
             years.add(year)
+        else:
+            year = ''.join(filter(str.isdigit, table))
+            if year and len(year) == 4:
+                years.add(year)
     
     years = sorted(years)
     
@@ -310,8 +430,15 @@ def generate_summary_report(conn):
         year_data = {'Year': year}
         
         # Check each table type
-        for table_type in ['DRVEF', 'AL', 'DRVAL']:
-            table_name = f"{table_type.lower()}{year}"
+        for table_type in ['DRVEF', 'AL', 'DRVAL', 'F']:
+            # Build expected table name
+            if table_type == 'F':
+                # Finance table - need to construct the name
+                # For year 2023, finance table is f2223_f2
+                prev_year = str(int(year) - 1)
+                table_name = f"f{prev_year[-2:]}{year[-2:]}_f2"
+            else:
+                table_name = f"{table_type.lower()}{year}"
             
             if table_name in tables:
                 # Count institutions
@@ -328,6 +455,16 @@ def generate_summary_report(conn):
     
     print("\nInstitutions per table type and year:")
     print(summary_df.to_string(index=False))
+    
+    # Show which variables are being included from each table type
+    print(f"\n{'='*70}")
+    print("Variable Filters Applied")
+    print(f"{'='*70}")
+    for table_type, filter_list in VARIABLE_FILTERS.items():
+        if filter_list is None or len(filter_list) == 0:
+            print(f"{table_type.upper()}: All variables included")
+        else:
+            print(f"{table_type.upper()}: Only including {filter_list}")
     
     return summary_df
 
