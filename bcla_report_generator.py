@@ -168,8 +168,8 @@ def generate_combined_report(conn):
         institutions_df = pd.read_sql_query(query, conn)
         institutions_df['Institution Name'] = None
     
-    # Sort by UNITID for consistent ordering
-    institutions_df = institutions_df.sort_values('UNITID').reset_index(drop=True)
+    # Sort by Institution Name for consistent ordering
+    institutions_df = institutions_df.sort_values('Institution Name').reset_index(drop=True)
     
     print(f"Found {len(institutions_df)} institutions")
     
@@ -291,8 +291,8 @@ def generate_year_reports(conn):
                 institutions_df = pd.read_sql_query(query, conn)
                 institutions_df['Institution Name'] = None
         
-        # Sort by UNITID
-        institutions_df = institutions_df.sort_values('UNITID').reset_index(drop=True)
+        # Sort by Institution Name
+        institutions_df = institutions_df.sort_values('Institution Name').reset_index(drop=True)
         
         # Start with institutions
         year_df = institutions_df.copy()

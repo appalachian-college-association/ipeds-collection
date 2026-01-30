@@ -4,38 +4,42 @@ This workflow processes IPEDS .accdb files (2019-2024) to create a SQLite databa
 
 ## Overview
 
-The workflow consists of three Python scripts that work together:
+The workflow consists of four Python scripts that work together:
 
 1. **bcla_library_import.py** - Extracts data from .accdb files into SQLite
 2. **bcla_variable_titles.py** - Adds user-friendly column names from Excel documentation
-3. **bcla_report_generator.py** - Creates Excel reports for committee presentation
+3. **bcla_report_generator.py** - Creates Excel reports for Academic Libraries data for BCLA member libraries
+4. **aca_fte_expenses_report.py** - Creates Excel report with FTE and F2 (total expenses) for BCLA member libraries
 
 ## Files You Need
 
 Before running the scripts, make sure you have these files in your project directory:
 
 ### IPEDS .accdb files (5 files):
-- `ipeds201920.accdb` (2019-20 academic year)
-- `ipeds202021.accdb` (2020-21 academic year)
-- `ipeds202122.accdb` (2021-22 academic year)
-- `ipeds202223.accdb` (2022-23 academic year)
-- `ipeds202324.accdb` (2023-24 academic year)
+- `IPEDS201920.accdb` (2019-20 academic year)
+- `IPEDS202021.accdb` (2020-21 academic year)
+- `IPEDS202122.accdb` (2021-22 academic year)
+- `IPEDS202223.accdb` (2022-23 academic year)
+- `IPEDS202324.accdb` (2023-24 academic year)
 
 ### IPEDS Excel documentation files (5 files):
-- `ipeds201920tablesdoc.xlsx`
-- `ipeds202021tablesdoc.xlsx`
-- `ipeds202122tablesdoc.xlsx`
-- `ipeds202223tablesdoc.xlsx`
-- `ipeds202324tablesdoc.xlsx`
+- `IPEDS201920tablesdoc.xlsx`
+- `IPEDS202021tablesdoc.xlsx`
+- `IPEDS202122tablesdoc.xlsx`
+- `IPEDS202223tablesdoc.xlsx`
+- `IPEDS202324tablesdoc.xlsx`
+
+These files are available for download from IPEDS:
+https://nces.ed.gov/ipeds/use-the-data/download-access-database (last accessed 1/30/2026)
 
 ## Required Python Packages
 
 Install the required packages using these commands in your terminal:
 
 ```bash
-pip install pandas --break-system-packages
-pip install pyodbc --break-system-packages
-pip install openpyxl --break-system-packages
+pip install pandas
+pip install pyodbc
+pip install openpyxl
 ```
 
 **Note about pyodbc:** This package requires the Microsoft Access Database Engine. On Windows, this is usually already installed. If you get errors about missing drivers, you may need to install the Microsoft Access Database Engine Redistributable.
@@ -47,17 +51,18 @@ pip install openpyxl --break-system-packages
 Run the main import script:
 
 ```bash
-python3 bcla_library_import.py
+python bcla_library_import.py
 ```
 
 **What this does:**
 - Connects to each .accdb file
-- Extracts three types of tables for each year:
+- Extracts five types of tables for each year:
   - DRVEF (Fall Enrollment - contains FTE variable)
+  - F (Financial - contains Total expenses variable)
   - AL (Academic Libraries - 37 variables)
   - DRVAL (Derived Academic Library Variables - 19 variables)
   - HD (Directory information - institution names)
-- Filters to only BCLA institutions (34 institutions)
+- Filters to only BCLA institutions (34 institutions -- JUF included as separate row)
 - Saves all data to `bcla_library.sqlite`
 
 **What to expect:**
@@ -72,7 +77,7 @@ python3 bcla_library_import.py
 Run the variable titles script:
 
 ```bash
-python3 bcla_variable_titles.py
+python bcla_variable_titles.py
 ```
 
 **What this does:**
@@ -90,10 +95,11 @@ python3 bcla_variable_titles.py
 
 ### Step 3: Generate Reports
 
-Run the report generator:
+Run the report generators:
 
 ```bash
-python3 bcla_report_generator.py
+python bcla_report_generator.py
+python aca_fte_expenses_report.py
 ```
 
 **What this does:**
@@ -113,11 +119,14 @@ python3 bcla_report_generator.py
 
 ## Output Files
 
-After running all three scripts, you'll have:
+After running all four scripts, you'll have:
 
 1. **bcla_library.sqlite** - Your SQLite database with all the data
 2. **BCLA_Library_Combined_YYYYMMDD_HHMMSS.xlsx** - Combined report (if you chose option 1 or 3)
 3. **BCLA_Library_2019_YYYYMMDD_HHMMSS.xlsx** through **BCLA_Library_2023_YYYYMMDD_HHMMSS.xlsx** - Year-specific reports (if you chose option 2 or 3)
+4. **ACA_Member_FTE_Expenses_Combined_YYYYMMDD_HHMMSS.xlsx** - Combined report (if you chose option 1 or 3)
+3. **ACA_Member_FTE_2019_YYYYMMDD_HHMMSS.xlsx** through **BCLA_Library_2023_YYYYMMDD_HHMMSS.xlsx** - Year-specific reports (if you chose option 2 or 3)
+
 
 The timestamp (YYYYMMDD_HHMMSS) ensures files don't overwrite each other when you run the script multiple times.
 
@@ -131,6 +140,7 @@ Your SQLite database will contain these tables:
 - `drvef2019` through `drvef2023` - Fall Enrollment with FTE variable
 - `al2019` through `al2023` - Academic Libraries data (37 variables)
 - `drval2019` through `drval2023` - Derived Academic Library Variables (19 variables)
+- 'f1819_f2' through 'f2223_f2' - Total Expenses with F2E131 variable
 
 **Institution Tables (5 tables):**
 - `hd2019` through `hd2023` - Institution names and IDs
@@ -276,6 +286,20 @@ Creates readable column names. It:
 ### bcla_report_generator.py
 Creates Excel reports. It:
 - Reads data from the SQLite database
+- Looks up user-friendly names for variables
+- Combines data from multiple tables
+- Creates Excel files with your data
+
+**Key functions:**
+- `generate_combined_report()` - Creates one file with all years
+- `generate_year_reports()` - Creates one file per year
+- `save_reports()` - Writes Excel files
+
+### aca_fte_expenses_report.py
+Creates simplified Excel reports with just FTE enrollment and Total Expenses. It reads data from:
+- Historical years (2019-2023): SQLite database (bcla_library.sqlite)
+- Most recent year: CSV export from IPEDS Data Center (aca-ipeds-fte-f2e131-{year}.csv)
+
 - Looks up user-friendly names for variables
 - Combines data from multiple tables
 - Creates Excel files with your data
