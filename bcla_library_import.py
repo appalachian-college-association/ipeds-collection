@@ -56,7 +56,7 @@ BCLA_UNITIDS = [
 ]
 
 # Years to process (IPEDS survey years)
-YEARS = [2019, 2020, 2021, 2022, 2023]
+YEARS = [2019, 2020, 2021, 2022, 2023, 2024]
 
 # SQLite database path
 DB_PATH = "bcla_library.sqlite"

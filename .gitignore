@@ -14,5 +14,6 @@ PROJECT_STATUS.md
 # Python
 __pycache__/
 *.pyc
+CLAUDE.md
 
 

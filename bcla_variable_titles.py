@@ -45,6 +45,11 @@ FILE_MAPPINGS = [
         'file': 'IPEDS202324TablesDoc.xlsx',
         'sheet': 'vartable23',
         'year': '2023'
+    },
+        {
+        'file': 'IPEDS202425TablesDoc.xlsx',
+        'sheet': 'vartable24',
+        'year': '2024'
     }
 ]
 
