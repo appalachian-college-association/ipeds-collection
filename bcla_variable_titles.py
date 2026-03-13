@@ -20,6 +20,7 @@ DB_PATH = "bcla_library.sqlite"
 
 # Define the mappings between Excel files and years
 # You'll need to update these filenames to match your actual files
+# Accommodates case changes in IPEDS filenames and Excel tab names 202324+
 FILE_MAPPINGS = [
     {
         'file': 'IPEDS201920TablesDoc.xlsx',
@@ -42,13 +43,13 @@ FILE_MAPPINGS = [
         'year': '2022'
     },
     {
-        'file': 'IPEDS202324TablesDoc.xlsx',
-        'sheet': 'vartable23',
+        'file': 'IPEDS202324Tablesdoc.xlsx',
+        'sheet': 'varTable23',
         'year': '2023'
     },
-        {
-        'file': 'IPEDS202425TablesDoc.xlsx',
-        'sheet': 'vartable24',
+    {
+        'file': 'IPEDS202425Tablesdoc.xlsx',
+        'sheet': 'varTable24',
         'year': '2024'
     }
 ]
@@ -87,16 +88,22 @@ def read_variable_mappings(file_mappings):
             print(f"Reading {file_path}, sheet {sheet_name}...")
             
             # Read the Excel sheet
+            # Read the Excel sheet
             df = pd.read_excel(file_path, sheet_name=sheet_name)
             
+            # Normalize column names to lowercase to handle NCES case changes
+            # (older files use 'varName'/'varTitle'; newer files use 'VarName'/'VarTitle')
+            df.columns = [col.lower() for col in df.columns]
+            
             # The sheet should have 'varName' and 'varTitle' columns
-            if 'varName' not in df.columns or 'varTitle' not in df.columns:
+            if 'varname' not in df.columns or 'vartitle' not in df.columns:
                 print(f"  ⚠ Warning: Required columns not found in {file_path}")
                 print(f"  Available columns: {list(df.columns)}")
                 continue
             
             # Select only the columns we need
-            df = df[['varName', 'varTitle']].copy()
+            df = df[['varname', 'vartitle']].copy()
+            df.columns = ['varName', 'varTitle']  # Restore expected names for rest of script
             df['year'] = year
             
             # Remove duplicate varNames within this year (keep first occurrence)
